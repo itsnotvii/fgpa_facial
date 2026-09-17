@@ -258,3 +258,15 @@ h1, h2 { margin: 0; }
   transition: background 0.12s ease, color 0.12s ease;
 }
 .roster .del:hover { color: #000; background: #fff; }
+
+.statusbar {
+  display: flex;
+  gap: 32px;
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.statusbar strong { color: var(--text-primary); font-weight: 700; }
