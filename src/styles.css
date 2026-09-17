@@ -90,3 +90,97 @@ h1, h2 { margin: 0; }
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
 }
+
+.grid { 
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+.viewport {
+  position: relative;
+  background: #000;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+}
+.viewport img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* facial placement outline */
+.face-guide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.face-guide .frame {
+  position: relative;
+  width: 42%;
+  height: 66%;
+}
+.face-guide .corner {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-color: #fff;
+  border-style: solid;
+  border-width: 0;
+  animation: pulse-frame 2s ease-in-out infinite;
+}
+@keyframes pulse-frame {
+  0%, 100% { opacity: 0.5; filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .face-guide .corner { animation: none; opacity: 1; }
+}
+.face-guide .corner.tl { top: 0; left: 0; border-top-width: 4px; border-left-width: 4px; }
+.face-guide .corner.tr { top: 0; right: 0; border-top-width: 4px; border-right-width: 4px; }
+.face-guide .corner.bl { bottom: 0; left: 0; border-bottom-width: 4px; border-left-width: 4px; }
+.face-guide .corner.br { bottom: 0; right: 0; border-bottom-width: 4px; border-right-width: 4px; }
+.face-guide-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: #000;
+  border: 1px solid var(--border);
+  padding: 7px 14px;
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 20px;
+}
+.panel h2 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
