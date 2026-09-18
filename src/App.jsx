@@ -38,4 +38,18 @@ export default function App() {
       clearInterval(statusTimer)
     }
   }, [refreshRoster, refreshStatus])
+
+  return (
+    <div className="app">
+      <TopBar enrolledCount={Object.keys(roster).length} />
+      <main className="grid">
+        <Viewport />
+        <aside className="sidebar">
+          <EnrollPanel onEnrolled={refreshRoster} />
+          <RosterPanel roster={roster} onDelete={deletePerson} />
+        </aside>
+      </main>
+      <StatusBar lastMatch={status.last_match} threshold={status.threshold} />
+    </div>
+  )
 }
