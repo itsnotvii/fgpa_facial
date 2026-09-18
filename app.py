@@ -23,77 +23,123 @@ COLOR_UNKNOWN = (91, 91, 227)
 
 class Camera: 
 
-  def __init__(self):
-    self.cap = cv2.VideoCapture(0)
-    self.lock = threading.Lock()
-    self.raw_frame = None
-    self.annotated_jpeg = None
-    self.last_match = {"name": None, "score": 0.0}
-    self.running = True
-    self.thread = threading.Thread(target=self._loop, daemon=True)
-    self.thread.start()
+    def __init__(self):
+        self.cap = cv2.VideoCapture(0)
+        self.lock = threading.Lock()
+        self.raw_frame = None
+        self.annotated_jpeg = None
+        self.last_match = {"name": None, "score": 0.0}
+        self.running = True
+        self.thread = threading.Thread(target=self._loop, daemon=True)
+        self.thread.start()
 
-  def _loop(self):
-    while self.running:
-      ok, frame = self.cap.read()
-      if not ok:
-        time.sleep(0.1)
-        continue
+    def _loop(self):
+        while self.running:
+          ok, frame = self.cap.read()
+          if not ok:
+              time.sleep(0.1)
+              continue
 
-      with self.lock:
-        self.raw_frame = frame.copy()
+          with self.lock:
+              self.raw_frame = frame.copy()
 
-      db = load_db()
-      annotated = frame.copy()
-      best_this_frame = {"name": None, "score": 0.0}
+          db = load_db()
+          annotated = frame.copy()
+          best_this_frame = {"name": None, "score": 0.0}
 
-      try:
-          faces = DeepFace.extract_faces(
-            img_path=frame,
-            detector_backend=DETECTOR_BACKEND,
-            enforce_backend=False,
-            align=True,
-          )
-      except Exception:
-        faces = []
+          try:
+              faces = DeepFace.extract_faces(
+                img_path=frame,
+                detector_backend=DETECTOR_BACKEND,
+                enforce_backend=False,
+                align=True,
+              )
+          except Exception:
+            faces = []
 
-      for face in faces:
-        if face.get("confidence", 1) == 0:
-            continue
+          for face in faces:
+            if face.get("confidence", 1) == 0:
+                continue
 
-        area = face["facial_area"]
-        x, y, w, h = area["x"], area["y"], area["w"], area["h"]
-        crop = frame[max(0, y):y + h, max(0,x):x + w]
-        if crop.size == 0:
-            continue
+            area = face["facial_area"]
+            x, y, w, h = area["x"], area["y"], area["w"], area["h"]
+            crop = frame[max(0, y):y + h, max(0,x):x + w]
+            if crop.size == 0:
+                continue
 
-        try: 
-            result = DeepFace.represent(
-               img_path=crop,
-               model_name=MODEL_NAME,
-               detector_backend="skip",
-               enforce_detection=False,
+            try: 
+                result = DeepFace.represent(
+                    img_path=crop,
+                    model_name=MODEL_NAME,
+                    detector_backend="skip",
+                    enforce_detection=False,
+                )
+                embedding = result[0]["embedding"]
+                name, score = best_match(embedding, db, threshold=SIMILARITY_THRESHOLD)
+            except Exception:
+                name, score = None, 0.0
+
+            label = f"{name} ({score:.2f})" if name else f"Unknown ({score:.2f})"
+            color = COLOR_MATCH if name else COLOR_UNKNOWN
+            cv2.rectangle(annotated, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(
+                annotated, label, (x, max(0, y - 10)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
             )
-            embedding = result[0]["embedding"]
-            name, score = best_match(embedding, db, threshold=SIMILARITY_THRESHOLD)
-        except Exception:
-           name, score = None, 0.0
 
-        label = f"{name} ({score:.2f})" if name else f"Unknown ({score:.2f})"
-        color = COLOR_MATCH if name else COLOR_UNKNOWN
-        cv2.rectangle(annotated, (x, y), (x + w, y + h), color, 2)
-        cv2.putText(
-           annotated, label, (x, max(0, y - 10)),
-           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
-        )
+            if score > best_this_frame["score"]:
+                best_this_frame = {"name": name, "score": score}
 
-        if score > best_this_frame["score"]:
-            best_this_frame = {"name": name, "score": score}
+        self.last_match = best_this_frame
+        ok2, buf = cv2.imencode(".jpg", annotated)
+        if ok2:
+          with self.lock:
+              self.annotated_jpeg = buf.tobytes()
 
-    self.last_match = best_this_frame
-    ok2, buf = cv2.imencode(".jpg", annotated)
-    if ok2:
-      with self.lock:
-          self.annotated_jpeg = buf.tobytes()
+    def get_annotated_jpeg(self):
+        with self.lock:
+            return self.annotated_jpeg
+
+    def get_raw_frame(self):
+        with self.lock:
+            return None if self.raw_frame is None else self.raw_frame.copy()
+
+app = FastAPI(title="Sentry")
+app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
+camera = Camera()
+
+class EnrollRequest(BaseModel):
+    name: str
+
+@app.get("/")
+def index():
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+def _myjpeg_generator():
+    while True:
+        frame = camera.get_annotated_jpeg()
+        if frame is not None:
+            yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+        time.sleep(0.08)
+
+@app.get("/video_feed")
+def video_feed():
+    return StreamingResponse(
+        _mjpeg_generator(), media_type="multipart/x-mixed-replace; boundary=frame"
+    )   
+
+@app.post("/api/enroll")
+def enroll(req: EnrollRequest):
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required.")
+
+    frame = camera.get_raw_frame()
+    if frame is None:
+        raise HTTPException(status_code=503, detail="Camera isn't ready yet, try again in a second.")
+
+    try:
+        
+
 
       
