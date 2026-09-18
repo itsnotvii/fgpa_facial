@@ -23,5 +23,19 @@ export default function App() {
     }
   }, [])
 
-  
+  const deletePerson = useCallback(async (name) => {
+    await fetch(`/api/roster/${encodeURIComponent(name)}`, { method: 'DELETE' })
+    refreshRoster()
+  }, [refreshRoster])
+
+  useEffect(() => {
+    refreshRoster()
+    refreshStatus()
+    const rosterTimer = setInterval(refreshRoster, 4000)
+    const statusTimer = setInterval(refreshStatus, 1500)
+    return () => {
+      clearInterval(rosterTimer)
+      clearInterval(statusTimer)
+    }
+  }, [refreshRoster, refreshStatus])
 }
