@@ -56,4 +56,44 @@ class Camera:
           )
       except Exception:
         faces = []
+
+      for face in faces:
+        if face.get("confidence", 1) == 0:
+            continue
+
+        area = face["facial_area"]
+        x, y, w, h = area["x"], area["y"], area["w"], area["h"]
+        crop = frame[max(0, y):y + h, max(0,x):x + w]
+        if crop.size == 0:
+            continue
+
+        try: 
+            result = DeepFace.represent(
+               img_path=crop,
+               model_name=MODEL_NAME,
+               detector_backend="skip",
+               enforce_detection=False,
+            )
+            embedding = result[0]["embedding"]
+            name, score = best_match(embedding, db, threshold=SIMILARITY_THRESHOLD)
+        except Exception:
+           name, score = None, 0.0
+
+        label = f"{name} ({score:.2f})" if name else f"Unknown ({score:.2f})"
+        color = COLOR_MATCH if name else COLOR_UNKNOWN
+        cv2.rectangle(annotated, (x, y), (x + w, y + h), color, 2)
+        cv2.putText(
+           annotated, label, (x, max(0, y - 10)),
+           cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
+        )
+
+        if score > best_this_frame["score"]:
+            best_this_frame = {"name": name, "score": score}
+
+    self.last_match = best_this_frame
+    ok2, buf = cv2.imencode(".jpg", annotated)
+    if ok2:
+      with self.lock:
+          self.annotated_jpeg = buf.tobytes()
+
       
