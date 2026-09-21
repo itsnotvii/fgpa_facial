@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import TopBar from './components/TopBar.jsx'
 import Viewport from './components/Viewport.jsx'
 import EnrollPanel from './components/EnrollPanel'
 import RosterPanel from './components/RosterPanel'
-import StatusBar from './components/StatusBar.jsx'
 
 export default function App() {
   const [roster, setRoster] = useState({})
@@ -41,15 +39,14 @@ export default function App() {
 
   return (
     <div className="app">
-      <TopBar enrolledCount={Object.keys(roster).length} />
+      <h1 className="title">Face Recognition</h1>
       <main className="grid">
-        <Viewport />
+        <Viewport lastMatch={status.last_match} />
         <aside className="sidebar">
           <EnrollPanel onEnrolled={refreshRoster} />
           <RosterPanel roster={roster} onDelete={deletePerson} />
         </aside>
       </main>
-      <StatusBar lastMatch={status.last_match} threshold={status.threshold} />
     </div>
   )
 }

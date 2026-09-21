@@ -36,7 +36,7 @@ export default function EnrollPanel({ onEnrolled }) {
 
   return (
     <div className="panel enroll">
-      <h2>Enroll</h2>
+      <h2>Add person</h2>
       <input
         type="text"
         placeholder="Person's name"
@@ -44,7 +44,7 @@ export default function EnrollPanel({ onEnrolled }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <button type="button" onClick={capture}>Capture from feed</button>
+      <button type="button" onClick={capture}>Capture</button>
       <p className={`msg ${msg.type}`}>{msg.text}</p>
     </div>
   )
