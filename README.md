@@ -2,6 +2,14 @@
 
 My take-home for the SCE AI x FPGA project. It's a facial recognition pipeline that runs on my laptop with a small web dashboard. The real project runs inference on a KRIA K26 board, so this is basically the laptop version of that, where I get the whole pipeline working end to end first.
 
+## AI use
+
+Claude Code was used heavily throughout this project, as the assignment encouraged.
+
+- **What I decided:** the overall approach (DeepFace/ArcFace for embeddings, cosine similarity for matching, FastAPI + React for the dashboard), the UI direction (black and white, with the face-placement brackets), and what to fix and in what order.
+- **What Claude Code did:** wrote and edited most of the code, including `utils.py`, the dashboard, the camera and threading changes, and the README.
+- **What I did myself:** ran the app on my own machine and tested it with my webcam. I hit and debugged real problems (the iPhone camera being picked, the broken OpenCV detector, Safari not showing the video stream) and checked that the fixes worked. I also reviewed the code so I could explain how each stage of the pipeline works.
+
 ## How it works
 
 Roughly:
