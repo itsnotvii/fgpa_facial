@@ -111,7 +111,8 @@ class Camera:
 
 
 app = FastAPI(title="Sentry")
-app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
+if (FRONTEND_DIR / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
 camera = Camera()
 
 
@@ -121,7 +122,10 @@ class EnrollRequest(BaseModel):
 
 @app.get("/")
 def index():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    index_file = FRONTEND_DIR / "index.html"
+    if not index_file.exists():
+        raise HTTPException(status_code=503, detail="Frontend not built. Run `npm run build` in frontend/.")
+    return FileResponse(index_file)
 
 
 def _mjpeg_generator():
