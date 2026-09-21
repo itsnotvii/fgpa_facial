@@ -1,0 +1,11 @@
+# Biometric data — never commit
+embeddings.json
+embeddings.tmp
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Frontend
+frontend/node_modules/
