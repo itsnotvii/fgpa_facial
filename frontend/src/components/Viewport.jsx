@@ -54,6 +54,14 @@ export default function Viewport({ lastMatch }) {
       ) : (
         <div className="placeholder">Starting camera…</div>
       )}
+      <div className="guide" aria-hidden="true">
+        <div className="guide-frame">
+          <span className="tl"></span>
+          <span className="tr"></span>
+          <span className="bl"></span>
+          <span className="br"></span>
+        </div>
+      </div>
       <div className={`chip ${state}`}>{label}</div>
     </section>
   )

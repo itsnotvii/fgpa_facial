@@ -1,11 +1,11 @@
 :root {
-  --bg: #0b0d10;
-  --card: #14171c;
-  --card-2: #1b1f26;
-  --border: rgba(255, 255, 255, 0.08);
-  --text: #f2f4f7;
-  --text-2: #98a1ae;
-  --accent: #4fd1a5;
+  --bg: #000;
+  --card: #0d0d0d;
+  --card-2: #171717;
+  --border: rgba(255, 255, 255, 0.14);
+  --text: #fff;
+  --text-2: #9a9a9a;
+  --match: #4fd1a5;
   --danger: #e35b5b;
   --radius: 16px;
 }
@@ -75,6 +75,32 @@ h1, h2 { margin: 0; }
   font-size: 14px;
 }
 
+/* corner brackets showing where to place your face */
+.guide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.guide-frame {
+  position: relative;
+  width: 40%;
+  height: 64%;
+}
+.guide-frame span {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border: 0 solid rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6));
+}
+.guide-frame .tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 10px; }
+.guide-frame .tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 10px; }
+.guide-frame .bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 10px; }
+.guide-frame .br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 10px; }
+
 .chip {
   position: absolute;
   left: 16px;
@@ -84,12 +110,12 @@ h1, h2 { margin: 0; }
   font-size: 13px;
   font-weight: 550;
   color: var(--text);
-  background: rgba(11, 13, 16, 0.7);
+  background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border);
 }
-.chip.match { color: var(--accent); }
+.chip.match { color: var(--match); }
 .chip.unknown { color: var(--danger); }
 .chip.idle { color: var(--text-2); }
 
@@ -124,12 +150,12 @@ h1, h2 { margin: 0; }
   transition: border-color 0.15s ease;
 }
 .enroll input::placeholder { color: var(--text-2); opacity: 0.7; }
-.enroll input:focus { outline: none; border-color: var(--accent); }
+.enroll input:focus { outline: none; border-color: #fff; }
 
 .enroll button {
   width: 100%;
-  background: var(--accent);
-  color: #06281d;
+  background: #fff;
+  color: #000;
   border: none;
   border-radius: 10px;
   font-family: inherit;
@@ -137,14 +163,14 @@ h1, h2 { margin: 0; }
   font-weight: 650;
   padding: 12px;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.05s ease;
+  transition: background 0.15s ease, transform 0.05s ease;
 }
-.enroll button:hover { filter: brightness(1.08); }
+.enroll button:hover { background: #e2e2e2; }
 .enroll button:active { transform: scale(0.99); }
-.enroll button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.enroll button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 .msg { font-size: 13px; min-height: 18px; margin: 10px 0 0; color: var(--text-2); }
-.msg.success { color: var(--accent); }
+.msg.success { color: var(--match); }
 .msg.error { color: var(--danger); }
 
 .roster ul { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; }
