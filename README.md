@@ -1,61 +1,63 @@
-# Sentry — Facial Recognition Pipeline
+# Face Recognition Take-Home
 
-End-to-end facial detection and recognition on a laptop webcam, with a live web dashboard. Built as the SCE "AI x FPGA" take-home. The long-term target is running the inference stage on an AMD KRIA K26 SOM (Vitis AI); this repo is the laptop prototype of that pipeline.
+My take-home for the SCE AI x FPGA project. It's a facial recognition pipeline that runs on my laptop with a small web dashboard. The real project runs inference on a KRIA K26 board, so this is basically the laptop version of that, where I get the whole pipeline working end to end first.
 
-## Pipeline
+## How it works
 
-```
-webcam ──> face detection ──> alignment/crop ──> embedding (ArcFace) ──> cosine match vs. enrolled DB ──> annotated MJPEG ──> React dashboard
-```
+Roughly:
 
-1. **Capture** — `Camera` (in `app.py`) owns the webcam (OpenCV `VideoCapture`) and runs a background thread so slow inference never blocks the HTTP server.
-2. **Detect** — `DeepFace.extract_faces` with the OpenCV detector returns face boxes and aligned crops. Frames with no face (confidence 0) are skipped.
-3. **Embed** — each face is turned into a 512-dim ArcFace vector via `DeepFace.represent`. Two photos of the same person land close together in this space.
-4. **Match** — `utils.best_match` computes cosine similarity against every stored embedding and takes the best. At or above the threshold (0.40) it is a match; otherwise "Unknown". The score is always returned so the UI can display it.
-5. **Annotate + stream** — boxes and labels are drawn (green = match, red = unknown), JPEG-encoded, and served as MJPEG at `/video_feed`.
-6. **Enroll** — `POST /api/enroll` grabs the current frame, embeds the face, and appends it to that person's entry in `embeddings.json`. The camera loop reloads the DB each pass, so new people are recognized live.
+webcam -> find faces -> embed each face -> compare to saved people -> draw boxes -> stream to the browser
 
-## Tool choices and why
+Going through it step by step:
 
-| Tool | Why |
-|---|---|
-| **DeepFace** | One API for detection, alignment, and embedding; the course slides suggest existing models over building from scratch. |
-| **ArcFace** | Strong accuracy for its size, and a fixed-size embedding makes matching a simple vector comparison. |
-| **OpenCV detector** | Fast and dependency-light on CPU. Weaker than CNN detectors; the FPGA phase would swap in an optimized AMD model. |
-| **Cosine similarity** | Standard for ArcFace embeddings; cheap enough to run on the server even on the FPGA-based design. |
-| **FastAPI** | Simple typed endpoints plus streaming responses. |
-| **React (Vite)** | Lightweight dashboard: live feed, enroll form, roster, status. |
-| **JSON file store** | Zero setup and human-readable. A real deployment would use SQLite or a vector store. |
+1. **Camera.** OpenCV reads the webcam in a background thread. I did it this way so the slow face stuff doesn't freeze the web server.
+2. **Detection.** DeepFace finds the faces in each frame. If it doesn't find one, the frame is skipped.
+3. **Embedding.** Each face goes through ArcFace, which turns it into a list of 512 numbers. Pictures of the same person end up with similar numbers.
+4. **Matching.** I compare that vector to every saved one using cosine similarity and take the best score. If it's 0.40 or higher it's a match, otherwise it says Unknown. The score always gets returned so it can be shown on screen either way.
+5. **Drawing + streaming.** Green box for a match, red for unknown. The frames get sent to the browser as an MJPEG stream.
+6. **Enrolling.** Type a name in the dashboard and hit Capture. The server grabs the current frame, embeds it, and saves it under that name in `embeddings.json`. The camera loop reloads the file every pass, so a new person is recognized right away without restarting.
 
-### Threshold
+## Why these tools
 
-`SIMILARITY_THRESHOLD = 0.40` is a cosine *similarity* (higher = more alike). DeepFace's own ArcFace cosine cutoff is a distance of 0.68 (similarity ≈ 0.32), so 0.40 is deliberately stricter: fewer false accepts, at the cost of more false "Unknown" results. Tune it on your own lighting and camera.
+- **DeepFace + ArcFace:** the slides said to use an existing model instead of building one, and DeepFace does detection, alignment and embeddings in one library. ArcFace gives a fixed-size vector, so matching is just comparing two lists of numbers.
+- **YuNet detector:** a small, fast face detector that runs fine on a CPU and finds faces much more reliably than the old Haar-cascade one. On the board this part would get swapped for AMD's optimized detection model anyway.
+- **Cosine similarity:** the standard way to compare ArcFace embeddings, and it's cheap enough to keep on the server even when the board does the embedding.
+- **FastAPI:** easy endpoints and it can stream responses.
+- **React (Vite):** a small dashboard with the live feed, an enroll box and a list of people.
+- **JSON file for storage:** no setup and I can open it and read it. A real version should use SQLite or something similar.
 
-## Mapping to the FPGA (KRIA K26)
+About the threshold: 0.40 is a cosine *similarity*, so higher means more alike. As I understand it, DeepFace's default cutoff for ArcFace is a distance of 0.68, which works out to a similarity of about 0.32. I'm using 0.40 so it's stricter. That means fewer wrong matches but sometimes it says Unknown when it shouldn't. It probably needs tuning for your lighting and camera.
 
-- **Moves to the board:** detection and ArcFace embedding inference (the CNN work), via Vitis AI.
-- **Stays on the server:** cosine matching, enrollment storage, and the dashboard. The board would return embeddings, and `DeepFace.represent` is the single call to replace.
+## Where the FPGA comes in
 
-## Run it
+The heavy part is the CNN work, meaning detection and the ArcFace embedding. That's what would move to the KRIA K26 with Vitis AI. Everything else (matching, storage, the dashboard) can stay on the server. In the code it's basically one call to swap, `DeepFace.represent`, so the board would send back embeddings instead.
+
+## Running it
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-cd frontend && npm install && npm run build && cd ..
+cd frontend
+npm install
+npm run build
+cd ..
 
 uvicorn app:app --port 8000
 ```
 
-Open http://localhost:8000. The first run downloads the ArcFace weights, so it is slow. Allow camera access when prompted.
+By default it uses the first camera that gives a lit frame. If that picks the wrong one (like an iPhone via Continuity Camera), set `CAMERA_INDEX=1` (or 0, 2...) before `uvicorn`.
 
-API: `GET /video_feed`, `POST /api/enroll {"name": "..."}`, `GET /api/roster`, `DELETE /api/roster/{name}`, `GET /api/status`.
+Then go to http://localhost:8000. The first run downloads the ArcFace weights, so it takes a while. Your computer will ask for camera permission.
 
-## Known limitations
+Endpoints, if you want to poke at them: `GET /video_feed`, `POST /api/enroll` with `{"name": "..."}`, `GET /api/roster`, `DELETE /api/roster/{name}`, `GET /api/status`.
 
-- No authentication: anyone who can reach the server can view the feed or enroll/delete people. Run it on a trusted network (e.g. Tailscale).
-- No liveness detection: a photo of an enrolled person can match.
-- Enrollment uses a single frame and the first detected face. Several varied frames would be more robust.
-- The recognition step re-crops the raw frame instead of reusing the aligned crop from detection, which likely costs some accuracy.
-- The JSON store is not safe against concurrent read-modify-write from multiple requests.
-- Embeddings are biometric data stored unencrypted; `embeddings.json` is git-ignored.
+## Things that aren't great yet
+
+- No login. Anyone who can reach the server can see the feed or add and delete people, so keep it on a trusted network (Tailscale, like the slides).
+- No liveness check, so a photo of someone enrolled would probably work.
+- Enrolling only uses one frame and the first face it sees. A few frames from different angles would be better.
+- After detection, the recognition step crops the raw frame again instead of using the already-aligned face. That probably costs some accuracy.
+- The JSON store isn't safe if two requests write at the same time.
+- Embeddings are biometric data and they're saved unencrypted. `embeddings.json` is in `.gitignore` so it doesn't get committed.
