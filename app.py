@@ -7,7 +7,7 @@ from pathlib import Path
 import cv2
 from deepface import DeepFace
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -56,24 +56,32 @@ class Camera:
         self.cap = self._open_camera()
         self.lock = threading.Lock()
         self.raw_frame = None
-        self.annotated_jpeg = None
+        self.detections = []  # [(x, y, w, h, label, color)] from the latest recognition pass
         self.last_match = {"name": None, "score": 0.0}
         self.running = True
-        self.thread = threading.Thread(target=self._loop, daemon=True)
-        self.thread.start()
+        threading.Thread(target=self._capture_loop, daemon=True).start()
+        threading.Thread(target=self._recognize_loop, daemon=True).start()
 
-    def _loop(self):
+    def _capture_loop(self):
+        """Read the webcam as fast as it delivers frames so the feed stays smooth."""
         while self.running:
             ok, frame = self.cap.read()
             if not ok:
                 time.sleep(0.1)
                 continue
-
             with self.lock:
-                self.raw_frame = frame.copy()
+                self.raw_frame = frame
+
+    def _recognize_loop(self):
+        """Slow detect + embed + match pass; publishes boxes for the stream to draw."""
+        while self.running:
+            frame = self.get_raw_frame()
+            if frame is None:
+                time.sleep(0.05)
+                continue
 
             db = load_db()  # reload each pass so new enrollments show up live
-            annotated = frame.copy()
+            detections = []
             best_this_frame = {"name": None, "score": 0.0}
 
             try:
@@ -110,28 +118,32 @@ class Camera:
 
                 label = f"{name} ({score:.2f})" if name else f"Unknown ({score:.2f})"
                 color = COLOR_MATCH if name else COLOR_UNKNOWN
-                cv2.rectangle(annotated, (x, y), (x + w, y + h), color, 2)
-                cv2.putText(
-                    annotated, label, (x, max(0, y - 10)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
-                )
+                detections.append((x, y, w, h, label, color))
 
                 if score > best_this_frame["score"]:
                     best_this_frame = {"name": name, "score": score}
 
+            self.detections = detections
             self.last_match = best_this_frame
-            ok2, buf = cv2.imencode(".jpg", annotated)
-            if ok2:
-                with self.lock:
-                    self.annotated_jpeg = buf.tobytes()
 
     def get_annotated_jpeg(self):
-        with self.lock:
-            return self.annotated_jpeg
+        """Latest raw frame with the most recent recognition boxes drawn on it."""
+        frame = self.get_raw_frame()
+        if frame is None:
+            return None
+        for x, y, w, h, label, color in self.detections:
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(
+                frame, label, (x, max(15, y - 10)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
+            )
+        ok, buf = cv2.imencode(".jpg", frame)
+        return buf.tobytes() if ok else None
 
     def get_raw_frame(self):
         with self.lock:
             return None if self.raw_frame is None else self.raw_frame.copy()
+
 
 
 app = FastAPI(title="Sentry")
@@ -165,6 +177,16 @@ def video_feed():
     return StreamingResponse(
         _mjpeg_generator(), media_type="multipart/x-mixed-replace; boundary=frame"
     )
+
+
+@app.get("/snapshot.jpg")
+def snapshot():
+    """One annotated frame. The dashboard polls this, since Safari won't render
+    an MJPEG stream inside an <img>."""
+    frame = camera.get_annotated_jpeg()
+    if frame is None:
+        raise HTTPException(status_code=503, detail="Camera isn't ready yet.")
+    return Response(content=frame, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/enroll")
