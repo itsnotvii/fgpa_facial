@@ -1,4 +1,5 @@
 
+import os
 import threading
 import time
 from pathlib import Path
@@ -28,8 +29,26 @@ class Camera:
     """Owns the webcam, runs detection/recognition in a background thread,
     and exposes thread-safe access to the latest raw + annotated frames."""
 
+    @staticmethod
+    def _open_camera():
+        """Return the first camera index that actually yields a frame.
+        Some indices (virtual/Continuity cameras) open but never deliver frames.
+        Set CAMERA_INDEX to force a specific one."""
+        forced = os.environ.get("CAMERA_INDEX")
+        candidates = [int(forced)] if forced else range(5)
+        for index in candidates:
+            cap = cv2.VideoCapture(index)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                ok, _ = cap.read()
+                if ok:
+                    return cap
+            cap.release()
+        return cv2.VideoCapture(0)
+
     def __init__(self):
-        self.cap = cv2.VideoCapture(0)
+        self.cap = self._open_camera()
         self.lock = threading.Lock()
         self.raw_frame = None
         self.annotated_jpeg = None
