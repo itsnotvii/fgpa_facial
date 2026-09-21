@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from utils import add_embedding, best_match, load_db, save_db
 
 MODEL_NAME = "ArcFace"
-DETECTOR_BACKEND = "opencv"
+DETECTOR_BACKEND = "yunet"  # much more reliable than the Haar-based "opencv" detector
 SIMILARITY_THRESHOLD = 0.40
 
 # React (Vite) build output — run `npm run build` in frontend/ before serving.
@@ -41,9 +41,14 @@ class Camera:
             if cap.isOpened():
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                ok, _ = cap.read()
-                if ok:
-                    return cap
+                # macOS cameras return failed/black frames until exposure settles,
+                # and dead virtual cameras never leave black, so wait for a lit frame
+                deadline = time.time() + 3
+                while time.time() < deadline:
+                    ok, frame = cap.read()
+                    if ok and frame.mean() > 10:
+                        return cap
+                    time.sleep(0.05)
             cap.release()
         return cv2.VideoCapture(0)
 
@@ -179,7 +184,8 @@ def enroll(req: EnrollRequest):
             detector_backend=DETECTOR_BACKEND,
             enforce_detection=True,
         )
-    except ValueError:
+    except ValueError as e:
+        print(f"[enroll] DeepFace error: {e!r} (frame shape {frame.shape})")
         raise HTTPException(status_code=400, detail="No face detected — center your face and try again.")
 
     add_embedding(name, result[0]["embedding"])

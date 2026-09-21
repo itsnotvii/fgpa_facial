@@ -20,7 +20,7 @@ Going through it step by step:
 ## Why these tools
 
 - **DeepFace + ArcFace:** the slides said to use an existing model instead of building one, and DeepFace does detection, alignment and embeddings in one library. ArcFace gives a fixed-size vector, so matching is just comparing two lists of numbers.
-- **OpenCV detector:** it's fast and runs fine on a CPU. It's not the most accurate detector, but on the board this part would get swapped for AMD's optimized detection model anyway.
+- **YuNet detector:** a small, fast face detector that runs fine on a CPU and finds faces much more reliably than the old Haar-cascade one. On the board this part would get swapped for AMD's optimized detection model anyway.
 - **Cosine similarity:** the standard way to compare ArcFace embeddings, and it's cheap enough to keep on the server even when the board does the embedding.
 - **FastAPI:** easy endpoints and it can stream responses.
 - **React (Vite):** a small dashboard with the live feed, an enroll box and a list of people.
@@ -46,6 +46,8 @@ cd ..
 
 uvicorn app:app --port 8000
 ```
+
+By default it uses the first camera that gives a lit frame. If that picks the wrong one (like an iPhone via Continuity Camera), set `CAMERA_INDEX=1` (or 0, 2...) before `uvicorn`.
 
 Then go to http://localhost:8000. The first run downloads the ArcFace weights, so it takes a while. Your computer will ask for camera permission.
 
